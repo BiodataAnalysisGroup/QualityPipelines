@@ -68,3 +68,21 @@ If you prefer managing the installation yourself:
       - name: Run resqui
         run: resqui -t ${{ secrets.GITHUB_TOKEN }} -d ${{ secrets.DASHVERSE_TOKEN }}
 ```
+
+## Uploading to a self-hosted DashVerse
+
+By default results are uploaded to the public instance at
+`https://api.dashverse.cloud`. To upload to your own DashVerse, point resqui at
+its PostgREST endpoint with `-e` or the `DASHVERSE_ENDPOINT` environment
+variable. The token must be issued by that same instance.
+
+```yaml
+      - name: Run resqui
+        env:
+          DASHVERSE_ENDPOINT: ${{ vars.DASHVERSE_ENDPOINT }}  # e.g. http://192.168.1.10:3000
+        run: resqui -t ${{ secrets.GITHUB_TOKEN }} -d ${{ secrets.DASHVERSE_TOKEN }}
+```
+
+If the instance is only reachable from a private network, run the job on a
+[self-hosted runner](https://docs.github.com/en/actions/hosting-your-own-runners)
+inside that network (`runs-on: self-hosted`).

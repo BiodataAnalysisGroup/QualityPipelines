@@ -10,6 +10,8 @@ Options:
     --md <markdown_report> Path to a Markdown report to also generate from the JSON output.
     -t <github_token>     GitHub API token.
     -d <dashverse_token>  DashVerse API token.
+    -e <dashverse_url>    DashVerse API endpoint, e.g. http://192.168.1.10:3000
+                          (falls back to $DASHVERSE_ENDPOINT, then https://api.dashverse.cloud).
     -b <branch>           The Git branch to be checked.
     -v                    Verbose output.
     --version             Show the version of the script.
@@ -143,6 +145,7 @@ def resqui():
     branch = args["-b"]
     github_token = args["-t"]
     dashverse_token = args["-d"]
+    dashverse_endpoint = args["-e"]
     verbose = args["-v"]
 
     temp_dir = None
@@ -186,7 +189,11 @@ def resqui():
     else:
         print("GitHub API token \033[91m✖\033[0m")
 
-    context = Context(github_token=github_token, dashverse_token=dashverse_token)
+    context = Context(
+        github_token=github_token,
+        dashverse_token=dashverse_token,
+        dashverse_endpoint=dashverse_endpoint,
+    )
 
     print(f"Repository URL: {url}")
     print(f"Project name: {project_name}")
@@ -250,7 +257,7 @@ def resqui():
     print("Publishing summary ", end="")
     sys.stdout.flush()
     try:
-        summary.upload(context.dashverse_token)
+        summary.upload(context.dashverse_token, context.dashverse_endpoint)
     except (RuntimeError, ValueError) as e:
         print(f"\033[91m✖\033[0m {e}")
     else:

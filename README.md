@@ -47,6 +47,8 @@ Options:
     --md <markdown_report> Path to a Markdown report to also generate from the JSON output.
     -t <github_token>     GitHub API token.
     -d <dashverse_token>  DashVerse API token.
+    -e <dashverse_url>    DashVerse API endpoint, e.g. http://192.168.1.10:3000
+                          (falls back to $DASHVERSE_ENDPOINT, then https://api.dashverse.cloud).
     -b <branch>           The Git branch to be checked.
     -v                    Verbose output.
     --version             Show the version of the script.

@@ -13,6 +13,7 @@ class Context:
 
     github_token: Optional[str] = None
     dashverse_token: Optional[str] = None
+    dashverse_endpoint: Optional[str] = None
 
 
 @dataclass
@@ -93,6 +94,6 @@ class Summary:
         with open(filename, "w") as f:
             f.write(self.to_json())
 
-    def upload(self, dashverse_token=None):
-        api = APIClient(dashverse_token)
+    def upload(self, dashverse_token=None, dashverse_endpoint=None):
+        api = APIClient(dashverse_token, endpoint=dashverse_endpoint)
         api.post(self.to_json())

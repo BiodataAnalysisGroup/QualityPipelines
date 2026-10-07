@@ -17,6 +17,7 @@ resqui indicators
 | `--md` | `<markdown_report>` | — | Path for a Markdown report, generated from the JSON output after the assessment completes. |
 | `-t` | `<github_token>` | — | GitHub personal access token. Required by `HowFairIs` and `OpenSSFScorecard`. |
 | `-d` | `<dashverse_token>` | — | DashVerse API token. When provided, the summary is uploaded after assessment. |
+| `-e` | `<dashverse_url>` | `$DASHVERSE_ENDPOINT`, else `https://api.dashverse.cloud` | DashVerse API (PostgREST) endpoint to upload to. Accepts `http://` or `https://` (default when no scheme is given), an optional port and an optional base path, e.g. `http://192.168.1.10:3000` for a self-hosted instance. |
 | `-b` | `<branch>` | HEAD commit | Git branch, tag, or commit hash to assess. |
 | `-v` | — | off | Verbose output: prints full evidence text for each indicator. |
 | `--version` | — | — | Print the installed version and exit. |

@@ -296,6 +296,17 @@ class TestResquiMainPath(unittest.TestCase):
         with self._patches():
             resqui()  # must not raise
 
+    def test_dashverse_endpoint_flag_is_used_for_upload(self):
+        argv = ["resqui", "-d", "tok", "-e", "http://10.0.0.5:3000"]
+        with self._patches(argv=argv):
+            resqui()
+        self.summary.upload.assert_called_once_with("tok", "http://10.0.0.5:3000")
+
+    def test_dashverse_endpoint_defaults_to_none(self):
+        with self._patches(argv=["resqui", "-d", "tok"]):
+            resqui()
+        self.summary.upload.assert_called_once_with("tok", None)
+
     def test_indicator_success_path(self):
         from resqui.core import CheckResult
 

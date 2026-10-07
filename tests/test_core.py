@@ -39,6 +39,7 @@ class TestContext(unittest.TestCase):
         ctx = Context()
         self.assertIsNone(ctx.github_token)
         self.assertIsNone(ctx.dashverse_token)
+        self.assertIsNone(ctx.dashverse_endpoint)
 
     def test_tokens_stored(self):
         ctx = Context(github_token="gh-abc", dashverse_token="dv-xyz")
@@ -130,7 +131,15 @@ class TestSummary(unittest.TestCase):
             mock_api = MagicMock()
             MockAPIClient.return_value = mock_api
             s.upload(dashverse_token="tok-123")
-            MockAPIClient.assert_called_once_with("tok-123")
+            MockAPIClient.assert_called_once_with("tok-123", endpoint=None)
             mock_api.post.assert_called_once()
             payload = json.loads(mock_api.post.call_args[0][0])
             self.assertEqual(payload["@type"], "SoftwareQualityAssessment")
+
+    def test_upload_passes_endpoint_to_api_client(self):
+        s = self._make_summary()
+        with patch("resqui.core.APIClient") as MockAPIClient:
+            s.upload(dashverse_token="tok", dashverse_endpoint="http://10.0.0.5:3000")
+            MockAPIClient.assert_called_once_with(
+                "tok", endpoint="http://10.0.0.5:3000"
+            )
