@@ -43,6 +43,15 @@ Scans the repository history for accidentally committed secrets (API keys,
 tokens, passwords) using [Gitleaks](https://github.com/gitleaks/gitleaks).
 Runs via Docker.
 
+## Which revision is assessed
+
+resqui assesses the commit it is run on (or the one given with `-b`). Most
+plugins honour it, including RSFC. OpenSSF Scorecard is the exception: its
+checks (`has_ci_tests`, `has_published_package`, ...) look at the repository
+as a whole on GitHub, such as its pull-request history and the workflows on
+the default branch. On a feature branch or pull request, their results reflect
+the default branch rather than the changes under review.
+
 ## Interpreting results
 
 Each indicator produces a `CheckResult` with:

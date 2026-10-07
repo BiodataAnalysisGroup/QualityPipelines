@@ -128,6 +128,37 @@ class TestPluginSharedWorkspace(unittest.TestCase):
         self.assertNotIn("-t", command)
 
 
+    def _run_rsfc(self, commit):
+        def fake_rsfc_run(command, run_args=None):
+            run_args = run_args or []
+            workdir = run_args[run_args.index("-w") + 1]
+            output_dir = os.path.join(workdir, "rsfc_output")
+            os.makedirs(output_dir, exist_ok=True)
+            with open(os.path.join(output_dir, "rsfc_assessment.json"), "w") as f:
+                json.dump({"checks": []}, f)
+            fake_executor.calls.append((command, run_args))
+            return SimpleNamespace(stdout="", stderr="")
+
+        fake_executor = FakeExecutor()
+        fake_executor.run = fake_rsfc_run
+        plugin = RSFC.__new__(RSFC)
+        plugin.context = Context(github_token=None)
+        plugin.executor = fake_executor
+        plugin._cache = {}
+        with tempfile.TemporaryDirectory() as root:
+            with patch.dict(os.environ, self._env(root), clear=True):
+                plugin.execute("https://github.com/example/repo", commit)
+        return fake_executor.calls[0][0]
+
+    def test_rsfc_assesses_the_given_commit_not_the_default_branch(self):
+        command = self._run_rsfc("0123abcd")
+        self.assertIn("-b", command)
+        self.assertEqual(command[command.index("-b") + 1], "0123abcd")
+
+    def test_rsfc_without_commit_uses_default_branch(self):
+        command = self._run_rsfc(None)
+        self.assertNotIn("-b", command)
+
 class TestRSFCIndicatorMappings(unittest.TestCase):
     def _plugin_with_report(self, report):
         plugin = RSFC.__new__(RSFC)

@@ -69,6 +69,9 @@ class RSFC(IndicatorPlugin):
                 assessment_fpath = os.path.join(workspace.local_path, assessment_filename)
 
             command = ["--repo", url]
+            if commit_hash:
+                # Without -b, RSFC assesses the repository's default branch.
+                command += ["-b", commit_hash]
             if self.context.github_token:
                 command += ["-t", self.context.github_token]
 
