@@ -12,8 +12,8 @@ quality assessments automatically on every push.
    `https://github.com/USER_OR_GROUP/PROJECT/settings/environments`.
 
 3. Add a secret named `DASHVERSE_TOKEN` to that environment (obtain it from
-   your DashVerse instance). If you do not have a DashVerse token the step
-   will report a failure but the assessment itself still runs.
+   your DashVerse instance). This is optional: without a token the upload is
+   skipped and the assessment runs as usual.
 
 ## Minimal workflow
 

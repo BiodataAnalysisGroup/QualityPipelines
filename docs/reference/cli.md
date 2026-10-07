@@ -16,7 +16,7 @@ resqui indicators
 | `-o` | `<output_file>` | `resqui_summary.json` | Path for the JSON-LD output report. |
 | `--md` | `<markdown_report>` | — | Path for a Markdown report, generated from the JSON output after the assessment completes. |
 | `-t` | `<github_token>` | — | GitHub personal access token. Required by `HowFairIs` and `OpenSSFScorecard`. |
-| `-d` | `<dashverse_token>` | — | DashVerse API token. When provided, the summary is uploaded after assessment. |
+| `-d` | `<dashverse_token>` | `$DASHVERSE_TOKEN` | DashVerse API token. When provided (here or via `DASHVERSE_TOKEN`), the summary is uploaded after assessment; otherwise the upload is skipped. |
 | `-e` | `<dashverse_url>` | `$DASHVERSE_ENDPOINT`, else `https://api.dashverse.cloud` | DashVerse API (PostgREST) endpoint to upload to. Accepts `http://` or `https://` (default when no scheme is given), an optional port and an optional base path, e.g. `http://192.168.1.10:3000` for a self-hosted instance. |
 | `-b` | `<branch>` | HEAD commit | Git branch, tag, or commit hash to assess. |
 | `--fail-on` | `<outcomes>` | — | Comma-separated check outcomes (`fail`, `not_run`) that make resqui exit with code `2`, e.g. `--fail-on fail,not_run`. Use this to fail a CI job. Reports are still written and uploaded first. |

@@ -267,14 +267,17 @@ def resqui():
         json_to_markdown(output_file, markdown_report)
         print(f"Markdown report has been written to {markdown_report}")
 
-    print("Publishing summary ", end="")
-    sys.stdout.flush()
-    try:
-        summary.upload(context.dashverse_token, context.dashverse_endpoint)
-    except (RuntimeError, ValueError) as e:
-        print(f"\033[91m✖\033[0m {e}")
+    if context.dashverse_token or os.environ.get("DASHVERSE_TOKEN"):
+        print("Publishing summary ", end="")
+        sys.stdout.flush()
+        try:
+            summary.upload(context.dashverse_token, context.dashverse_endpoint)
+        except (RuntimeError, ValueError) as e:
+            print(f"\033[91m✖\033[0m {e}")
+        else:
+            print("\033[92m✔\033[0m")
     else:
-        print("\033[92m✔\033[0m")
+        print("Publishing summary skipped (no DashVerse token)")
 
     counts = summary.outcome_counts()
     print(f"Checks: {counts['pass']} passed, {counts['fail']} failed, {counts['not_run']} not run")

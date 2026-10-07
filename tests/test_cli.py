@@ -254,6 +254,11 @@ class TestResquiMainPath(unittest.TestCase):
         self.summary = MagicMock()
         self.summary.to_json.return_value = "{}"
 
+        env = patch.dict(os.environ)
+        env.start()
+        self.addCleanup(env.stop)
+        os.environ.pop("DASHVERSE_TOKEN", None)
+
     def _patches(self, argv=None, **overrides):
         """Return an ExitStack with standard patches applied."""
         stack = contextlib.ExitStack()
@@ -287,13 +292,13 @@ class TestResquiMainPath(unittest.TestCase):
 
     def test_upload_runtime_error_is_handled(self):
         self.summary.upload.side_effect = RuntimeError("network error")
-        with self._patches():
+        with self._patches(argv=["resqui", "-d", "tok"]):
             resqui()  # must not raise
         self.summary.upload.assert_called_once()
 
     def test_upload_value_error_is_handled(self):
         self.summary.upload.side_effect = ValueError("bad token")
-        with self._patches():
+        with self._patches(argv=["resqui", "-d", "tok"]):
             resqui()  # must not raise
 
     def _run_with_counts(self, argv, counts):
@@ -333,7 +338,7 @@ class TestResquiMainPath(unittest.TestCase):
         self.summary.outcome_counts.return_value = {"pass": 0, "fail": 1, "not_run": 0}
         mock_convert = MagicMock()
         with self._patches(
-            argv=["resqui", "--fail-on", "fail", "--md", "r.md"],
+            argv=["resqui", "--fail-on", "fail", "--md", "r.md", "-d", "tok"],
             **{"resqui.cli.json_to_markdown": mock_convert},
         ):
             with self.assertRaises(SystemExit):
@@ -357,6 +362,27 @@ class TestResquiMainPath(unittest.TestCase):
             resqui()
         printed = [str(c.args[0]) for c in mock_print.call_args_list if c.args]
         self.assertIn("Checks: 2 passed, 1 failed, 3 not run", printed)
+
+    def test_upload_is_skipped_without_a_token(self):
+        mock_print = MagicMock()
+        with self._patches(**{"builtins.print": mock_print}):
+            resqui()
+        self.summary.upload.assert_not_called()
+        printed = " ".join(str(c.args[0]) for c in mock_print.call_args_list if c.args)
+        self.assertIn("no DashVerse token", printed)
+        self.assertNotIn("Missing authentication token", printed)
+
+    def test_upload_uses_token_from_environment(self):
+        with patch.dict(os.environ, {"DASHVERSE_TOKEN": "env-tok"}):
+            with self._patches():
+                resqui()
+        self.summary.upload.assert_called_once()
+
+    def test_empty_token_environment_variable_skips_upload(self):
+        with patch.dict(os.environ, {"DASHVERSE_TOKEN": ""}):
+            with self._patches():
+                resqui()
+        self.summary.upload.assert_not_called()
 
     def test_dashverse_endpoint_flag_is_used_for_upload(self):
         argv = ["resqui", "-d", "tok", "-e", "http://10.0.0.5:3000"]
