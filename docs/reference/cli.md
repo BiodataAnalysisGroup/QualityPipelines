@@ -19,6 +19,7 @@ resqui indicators
 | `-d` | `<dashverse_token>` | — | DashVerse API token. When provided, the summary is uploaded after assessment. |
 | `-e` | `<dashverse_url>` | `$DASHVERSE_ENDPOINT`, else `https://api.dashverse.cloud` | DashVerse API (PostgREST) endpoint to upload to. Accepts `http://` or `https://` (default when no scheme is given), an optional port and an optional base path, e.g. `http://192.168.1.10:3000` for a self-hosted instance. |
 | `-b` | `<branch>` | HEAD commit | Git branch, tag, or commit hash to assess. |
+| `--fail-on` | `<outcomes>` | — | Comma-separated check outcomes (`fail`, `not_run`) that make resqui exit with code `2`, e.g. `--fail-on fail,not_run`. Use this to fail a CI job. Reports are still written and uploaded first. |
 | `-v` | — | off | Verbose output: prints full evidence text for each indicator. |
 | `--version` | — | — | Print the installed version and exit. |
 | `--help` | — | — | Print usage and exit. |
@@ -51,5 +52,8 @@ needs the module to be importable, not a registered console script.
 
 | Code | Meaning |
 |---|---|
-| `0` | Assessment completed (individual indicator failures do not affect the exit code) |
-| `1` | Fatal error (not a Git repository, clone failed, etc.) |
+| `0` | Assessment completed. Without `--fail-on`, indicator results never affect the exit code. |
+| `1` | Fatal error (not a Git repository, clone failed, invalid `--fail-on` value, etc.) |
+| `2` | Assessment completed, but at least one check has an outcome listed in `--fail-on` |
+
+At the end of every run resqui prints `Checks: X passed, Y failed, Z not run`.

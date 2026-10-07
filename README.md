@@ -50,6 +50,8 @@ Options:
     -e <dashverse_url>    DashVerse API endpoint, e.g. http://192.168.1.10:3000
                           (falls back to $DASHVERSE_ENDPOINT, then https://api.dashverse.cloud).
     -b <branch>           The Git branch to be checked.
+    --fail-on <outcomes>  Exit with code 2 if any check has one of these comma-separated
+                          outcomes: fail, not_run (e.g. --fail-on fail,not_run).
     -v                    Verbose output.
     --version             Show the version of the script.
     --help                Show this help message.

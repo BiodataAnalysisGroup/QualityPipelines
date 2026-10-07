@@ -125,6 +125,64 @@ class TestSummary(unittest.TestCase):
             data = json.load(f)
         self.assertEqual(data["@type"], "SoftwareQualityAssessment")
 
+    def _plugin(self, name="HowFairIs", version="0.1.0"):
+        plugin = MagicMock()
+        plugin.name = name
+        plugin.version = version
+        return plugin
+
+    def test_passing_result_has_pass_outcome(self):
+        s = self._make_summary()
+        s.add_indicator_result(
+            {"@id": "https://w3id.org/everse/i/indicators/license"},
+            self._plugin(),
+            CheckResult(status_id="schema:CompletedActionStatus", success=True),
+        )
+        check = json.loads(s.to_json())["checks"][0]
+        self.assertEqual(check["outcome"], "pass")
+
+    def test_failing_result_has_fail_outcome_even_if_status_completed(self):
+        # Plugins report CompletedActionStatus when the check *ran*; whether
+        # the indicator is satisfied lives in CheckResult.success.
+        s = self._make_summary()
+        s.add_indicator_result(
+            {"@id": "https://w3id.org/everse/i/indicators/license"},
+            self._plugin(),
+            CheckResult(status_id="schema:CompletedActionStatus", success=False),
+        )
+        check = json.loads(s.to_json())["checks"][0]
+        self.assertEqual(check["outcome"], "fail")
+
+    def test_add_not_run_records_the_check_with_reason(self):
+        s = self._make_summary()
+        s.add_not_run(
+            {"@id": "https://w3id.org/everse/i/indicators/has_ci-tests"},
+            self._plugin("OpenSSFScorecard", "5.0.0"),
+            "Docker is not available",
+        )
+        check = json.loads(s.to_json())["checks"][0]
+        self.assertEqual(check["outcome"], "not_run")
+        self.assertEqual(check["status"]["@id"], "schema:FailedActionStatus")
+        self.assertEqual(
+            check["assessesIndicator"]["@id"],
+            "https://w3id.org/everse/i/indicators/has_ci-tests",
+        )
+        self.assertEqual(check["checkingSoftware"]["name"], "OpenSSFScorecard")
+        self.assertIn("Docker is not available", check["evidence"])
+
+    def test_outcome_counts(self):
+        s = self._make_summary()
+        ind = {"@id": "https://example.org/i"}
+        s.add_indicator_result(ind, self._plugin(), CheckResult(success=True))
+        s.add_indicator_result(ind, self._plugin(), CheckResult(success=True))
+        s.add_indicator_result(ind, self._plugin(), CheckResult(success=False))
+        s.add_not_run(ind, self._plugin(), "boom")
+        self.assertEqual(s.outcome_counts(), {"pass": 2, "fail": 1, "not_run": 1})
+
+    def test_outcome_counts_empty(self):
+        s = self._make_summary()
+        self.assertEqual(s.outcome_counts(), {"pass": 0, "fail": 0, "not_run": 0})
+
     def test_upload_calls_api_client(self):
         s = self._make_summary()
         with patch("resqui.core.APIClient") as MockAPIClient:

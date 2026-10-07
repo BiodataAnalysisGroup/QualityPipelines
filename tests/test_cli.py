@@ -296,6 +296,68 @@ class TestResquiMainPath(unittest.TestCase):
         with self._patches():
             resqui()  # must not raise
 
+    def _run_with_counts(self, argv, counts):
+        self.summary.outcome_counts.return_value = counts
+        with self._patches(argv=argv):
+            resqui()
+
+    def test_without_fail_on_failures_do_not_change_exit_code(self):
+        self._run_with_counts(["resqui"], {"pass": 1, "fail": 3, "not_run": 2})
+
+    def test_fail_on_fail_exits_2_when_a_check_fails(self):
+        with self.assertRaises(SystemExit) as cm:
+            self._run_with_counts(
+                ["resqui", "--fail-on", "fail"], {"pass": 1, "fail": 1, "not_run": 0}
+            )
+        self.assertEqual(cm.exception.code, 2)
+
+    def test_fail_on_fail_ignores_not_run(self):
+        self._run_with_counts(
+            ["resqui", "--fail-on", "fail"], {"pass": 1, "fail": 0, "not_run": 2}
+        )
+
+    def test_fail_on_list_includes_not_run(self):
+        with self.assertRaises(SystemExit) as cm:
+            self._run_with_counts(
+                ["resqui", "--fail-on", "fail,not_run"],
+                {"pass": 1, "fail": 0, "not_run": 1},
+            )
+        self.assertEqual(cm.exception.code, 2)
+
+    def test_fail_on_passes_when_everything_passes(self):
+        self._run_with_counts(
+            ["resqui", "--fail-on", "fail,not_run"], {"pass": 3, "fail": 0, "not_run": 0}
+        )
+
+    def test_fail_on_still_writes_and_uploads_before_exiting(self):
+        self.summary.outcome_counts.return_value = {"pass": 0, "fail": 1, "not_run": 0}
+        mock_convert = MagicMock()
+        with self._patches(
+            argv=["resqui", "--fail-on", "fail", "--md", "r.md"],
+            **{"resqui.cli.json_to_markdown": mock_convert},
+        ):
+            with self.assertRaises(SystemExit):
+                resqui()
+        self.summary.write.assert_called_once()
+        mock_convert.assert_called_once()
+        self.summary.upload.assert_called_once()
+
+    def test_fail_on_rejects_unknown_outcome(self):
+        with self.assertRaises(SystemExit) as cm:
+            self._run_with_counts(
+                ["resqui", "--fail-on", "fial"], {"pass": 0, "fail": 0, "not_run": 0}
+            )
+        self.assertEqual(cm.exception.code, 1)
+        self.summary.write.assert_not_called()
+
+    def test_outcome_summary_line_is_printed(self):
+        self.summary.outcome_counts.return_value = {"pass": 2, "fail": 1, "not_run": 3}
+        mock_print = MagicMock()
+        with self._patches(**{"builtins.print": mock_print}):
+            resqui()
+        printed = [str(c.args[0]) for c in mock_print.call_args_list if c.args]
+        self.assertIn("Checks: 2 passed, 1 failed, 3 not run", printed)
+
     def test_dashverse_endpoint_flag_is_used_for_upload(self):
         argv = ["resqui", "-d", "tok", "-e", "http://10.0.0.5:3000"]
         with self._patches(argv=argv):
@@ -411,6 +473,80 @@ class TestResquiMainPath(unittest.TestCase):
             resqui()  # must not raise; indicator is skipped
 
         self.summary.add_indicator_result.assert_not_called()
+
+    def test_init_error_records_not_run_checks_and_is_not_retried(self):
+        from resqui.executors.base import ExecutorInitError
+
+        mock_class = MagicMock(side_effect=ExecutorInitError("docker missing"))
+        mock_module = MagicMock()
+        mock_module.BrokenPlugin = mock_class
+
+        self.config._cfg = {
+            "indicators": [
+                {"name": "has_ci_tests", "plugin": "BrokenPlugin", "@id": "https://example.com/ci"},
+                {"name": "has_releases", "plugin": "BrokenPlugin", "@id": "https://example.com/rel"},
+            ]
+        }
+        with self._patches(
+            **{"resqui.cli.importlib.import_module": MagicMock(return_value=mock_module)}
+        ):
+            resqui()
+
+        self.assertEqual(mock_class.call_count, 1)
+        self.assertEqual(self.summary.add_not_run.call_count, 2)
+        indicator, plugin, reason = self.summary.add_not_run.call_args_list[0][0]
+        self.assertEqual(indicator["@id"], "https://example.com/ci")
+        self.assertIs(plugin, mock_class)
+        self.assertIn("docker missing", reason)
+
+    def test_results_are_attributed_to_their_own_plugin_when_interleaved(self):
+        from resqui.core import CheckResult
+
+        def plugin_class(name):
+            instance = MagicMock()
+            instance.check.return_value = CheckResult(success=True)
+            cls = MagicMock(return_value=instance)
+            cls.name = name
+            return cls
+
+        mock_module = MagicMock()
+        mock_module.PluginA = plugin_class("PluginA")
+        mock_module.PluginB = plugin_class("PluginB")
+        self.config._cfg = {
+            "indicators": [
+                {"name": "check", "plugin": "PluginA", "@id": "https://example.com/1"},
+                {"name": "check", "plugin": "PluginB", "@id": "https://example.com/2"},
+                {"name": "check", "plugin": "PluginA", "@id": "https://example.com/3"},
+            ]
+        }
+        with self._patches(
+            **{"resqui.cli.importlib.import_module": MagicMock(return_value=mock_module)}
+        ):
+            resqui()
+
+        attributed = [c[0][1].name for c in self.summary.add_indicator_result.call_args_list]
+        self.assertEqual(attributed, ["PluginA", "PluginB", "PluginA"])
+
+    def test_indicator_exception_records_not_run_check(self):
+        mock_instance = MagicMock()
+        mock_instance.has_license.side_effect = ValueError("unexpected tool output")
+        mock_class = MagicMock(return_value=mock_instance)
+        mock_module = MagicMock()
+        mock_module.MockPlugin = mock_class
+
+        self.config._cfg = {
+            "indicators": [
+                {"name": "has_license", "plugin": "MockPlugin", "@id": "https://example.com/license"}
+            ]
+        }
+        with self._patches(
+            **{"resqui.cli.importlib.import_module": MagicMock(return_value=mock_module)}
+        ):
+            resqui()
+
+        self.summary.add_not_run.assert_called_once()
+        reason = self.summary.add_not_run.call_args[0][2]
+        self.assertIn("unexpected tool output", reason)
 
     def test_clone_url_path(self):
         with self._patches(

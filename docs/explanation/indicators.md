@@ -49,17 +49,23 @@ Each indicator produces a `CheckResult` with:
 
 | Field | Values |
 |---|---|
-| `output` | `valid` — indicator satisfied; `missing` — not found; `failed` — check error |
-| `status` | Schema.org action status IRI |
-| `evidence` | Human-readable finding from the underlying tool |
+| `outcome` | `pass` — indicator satisfied; `fail` — indicator not satisfied; `not_run` — the check could not be performed (e.g. its plugin failed to initialise, or the tool errored) |
+| `output` | The raw result reported by the tool (plugin-specific, e.g. `valid`, `invalid`, `true`) |
+| `status` | Schema.org action status IRI describing whether the check *action* completed |
+| `evidence` | Human-readable finding from the underlying tool, or the reason a check did not run |
 
-An indicator returning `missing` or `failed` does **not** abort the run — all
-configured indicators are always attempted.
+`outcome` is the field to rely on for pass/fail decisions (for example in CI,
+see `--fail-on` in the [CLI reference](../reference/cli.md)). `status` only
+says whether the check ran: most plugins report `schema:CompletedActionStatus`
+whether or not the indicator is satisfied.
+
+A failing or not-run check does **not** abort the run — all configured
+indicators are always attempted, and not-run checks are recorded in the
+report rather than left out.
 
 ## Status IDs
 
 | Status IRI | Meaning |
 |---|---|
-| `schema:CompletedActionStatus` | Check passed |
-| `schema:FailedActionStatus` | Check ran but found a problem |
-| `missing` | Check could not be completed (plugin skipped) |
+| `schema:CompletedActionStatus` | The check ran (see `outcome` for the result) |
+| `schema:FailedActionStatus` | The check could not be completed |

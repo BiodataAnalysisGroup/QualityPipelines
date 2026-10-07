@@ -13,6 +13,8 @@ Options:
     -e <dashverse_url>    DashVerse API endpoint, e.g. http://192.168.1.10:3000
                           (falls back to $DASHVERSE_ENDPOINT, then https://api.dashverse.cloud).
     -b <branch>           The Git branch to be checked.
+    --fail-on <outcomes>  Exit with code 2 if any check has one of these comma-separated
+                          outcomes: fail, not_run (e.g. --fail-on fail,not_run).
     -v                    Verbose output.
     --version             Show the version of the script.
     --help                Show this help message.
@@ -28,7 +30,7 @@ import subprocess
 import sys
 import tempfile
 
-from resqui.core import Context, Summary
+from resqui.core import OUTCOMES, Context, Summary
 from resqui.markdown_report import convert as json_to_markdown
 from resqui.config import Configuration
 from resqui.tools import (
@@ -138,6 +140,7 @@ def resqui():
         print_indicator_plugins()
         exit(0)
 
+    fail_on = parse_fail_on(args["--fail-on"])
     configuration = Configuration(args["-c"])
     output_file = args["-o"]
     markdown_report = args["--md"]
@@ -207,6 +210,7 @@ def resqui():
         author, email, project_name, url, software_version, branch_hash_or_tag
     )
     plugin_instances = {}
+    plugin_init_errors = {}
     for indicator in configuration._cfg["indicators"]:
         print(
             f"  {indicator['name']}/{indicator['plugin']}",
@@ -217,14 +221,22 @@ def resqui():
         base_package = __name__.rsplit(".", 1)[0]
         plugin_class_name = indicator["plugin"]
 
+        plugin_module = importlib.import_module(base_package + ".plugins")
+        plugin_class = getattr(plugin_module, plugin_class_name)
+
+        if plugin_class_name in plugin_init_errors:
+            print(f"⚠️  {plugin_init_errors[plugin_class_name]} (skipping its indicators)")
+            summary.add_not_run(indicator, plugin_class, plugin_init_errors[plugin_class_name])
+            continue
+
         if plugin_class_name not in plugin_instances:
-            plugin_module = importlib.import_module(base_package + ".plugins")
-            plugin_class = getattr(plugin_module, plugin_class_name)
             with Spinner(print_time=False):
                 try:
                     plugin_instances[plugin_class_name] = plugin_class(context)
                 except (ExecutorInitError, PluginInitError, subprocess.CalledProcessError) as e:
+                    plugin_init_errors[plugin_class_name] = f"{plugin_class_name} failed to initialise: {e}"
                     print(f"⚠️  {e} (skipping its indicators)")
+                    summary.add_not_run(indicator, plugin_class, plugin_init_errors[plugin_class_name])
                     continue
 
         plugin_instance = plugin_instances[plugin_class_name]
@@ -235,6 +247,7 @@ def resqui():
                 results = getattr(plugin_instance, plugin_method)(url, branch_hash_or_tag)
         except (subprocess.CalledProcessError, FileNotFoundError, ValueError) as e:
             print(f"\033[91m✖\033[0m {type(e).__name__}: {e}")
+            summary.add_not_run(indicator, plugin_class, f"{type(e).__name__}: {e}")
             continue
 
         for result in ensure_list(results):
@@ -262,6 +275,24 @@ def resqui():
         print(f"\033[91m✖\033[0m {e}")
     else:
         print("\033[92m✔\033[0m")
+
+    counts = summary.outcome_counts()
+    print(f"Checks: {counts['pass']} passed, {counts['fail']} failed, {counts['not_run']} not run")
+    if any(counts[outcome] for outcome in fail_on):
+        print(f"Failing because of checks with outcome: {', '.join(fail_on)}")
+        exit(2)
+
+
+def parse_fail_on(value):
+    """Parse the --fail-on option into a list of outcomes, exiting on unknown ones."""
+    if value is None:
+        return []
+    outcomes = [outcome.strip() for outcome in value.split(",") if outcome.strip()]
+    unknown = [outcome for outcome in outcomes if outcome not in OUTCOMES or outcome == "pass"]
+    if unknown:
+        print(f"Error: unknown --fail-on outcome(s): {', '.join(unknown)}. Use: fail, not_run")
+        exit(1)
+    return outcomes
 
 
 def print_indicator_plugins():

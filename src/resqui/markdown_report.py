@@ -16,13 +16,26 @@ def _escape(value):
     return str(value).replace("\\", "\\\\").replace("\n", " ").replace("|", "\\|").strip() or "-"
 
 
+_LABELS = {"pass": "PASS", "fail": "FAIL", "not_run": "NOT RUN"}
+
+
+def _outcome(check):
+    """The check's outcome; reports written before `outcome` existed fall back to the status."""
+    if "outcome" in check:
+        return check["outcome"]
+    return "pass" if check.get("status", {}).get("@id") == "schema:CompletedActionStatus" else "fail"
+
+
 def render(data: dict) -> str:
     """Render a parsed resqui JSON assessment as a Markdown report."""
     assessed = data.get("assessedSoftware", {})
     checks = data.get("checks", [])
+    outcomes = [_outcome(c) for c in checks]
     total = len(checks)
-    passed = sum(1 for c in checks if c.get("status", {}).get("@id") == "schema:CompletedActionStatus")
-    failed = total - passed
+    passed = outcomes.count("pass")
+    failed = outcomes.count("fail")
+    not_run = outcomes.count("not_run")
+    counts = f"{failed} failed, {not_run} not run" if not_run else f"{failed} failed"
 
     lines = [
         "# Software Quality Assessment",
@@ -33,7 +46,7 @@ def render(data: dict) -> str:
         f"- Project: {assessed.get('name', '-')}",
         f"- Repository: {assessed.get('url', '-')}",
         f"- Version: {assessed.get('softwareVersion', '-')}",
-        f"- Checks: {passed}/{total} successful ({failed} failed)",
+        f"- Checks: {passed}/{total} successful ({counts})",
         "",
         "## Assessments",
         "",
@@ -41,8 +54,8 @@ def render(data: dict) -> str:
         "| --- | --- | --- | --- | --- | --- |",
     ]
 
-    for check in checks:
-        status = "PASS" if check.get("status", {}).get("@id") == "schema:CompletedActionStatus" else "FAIL"
+    for check, outcome in zip(checks, outcomes):
+        status = _LABELS.get(outcome, outcome)
         indicator = check.get("assessesIndicator", {}).get("@id", "missing")
         tool = check.get("checkingSoftware", {}).get("name", "unknown")
         version = check.get("checkingSoftware", {}).get("version", "-")

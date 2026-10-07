@@ -62,6 +62,53 @@ class TestRender(unittest.TestCase):
         self.assertIn("- Checks: 0/0 successful (0 failed)", markdown)
 
 
+    def test_outcome_field_takes_precedence_over_status(self):
+        # A missing LICENSE is reported by the plugin as a completed action
+        # that did not pass; the report must show it as FAIL.
+        data = {
+            "assessedSoftware": {},
+            "checks": [
+                {
+                    "assessesIndicator": {"@id": "https://example.org/license"},
+                    "status": {"@id": "schema:CompletedActionStatus"},
+                    "output": "invalid",
+                    "outcome": "fail",
+                },
+                {
+                    "assessesIndicator": {"@id": "https://example.org/citation"},
+                    "status": {"@id": "schema:CompletedActionStatus"},
+                    "output": "valid",
+                    "outcome": "pass",
+                },
+            ],
+        }
+        markdown = render(data)
+        self.assertIn("- Checks: 1/2 successful (1 failed)", markdown)
+        self.assertIn("| https://example.org/license | unknown | - | invalid | FAIL |", markdown)
+
+    def test_not_run_checks_are_counted_and_labelled(self):
+        data = {
+            "assessedSoftware": {},
+            "checks": [
+                {
+                    "assessesIndicator": {"@id": "https://example.org/ci"},
+                    "status": {"@id": "schema:FailedActionStatus"},
+                    "output": "missing",
+                    "outcome": "not_run",
+                    "evidence": "Docker is not available",
+                },
+                {
+                    "assessesIndicator": {"@id": "https://example.org/license"},
+                    "status": {"@id": "schema:CompletedActionStatus"},
+                    "outcome": "pass",
+                },
+            ],
+        }
+        markdown = render(data)
+        self.assertIn("- Checks: 1/2 successful (0 failed, 1 not run)", markdown)
+        self.assertIn("| NOT RUN |", markdown)
+
+
 class TestConvert(unittest.TestCase):
     def test_reads_json_and_writes_markdown(self):
         with tempfile.TemporaryDirectory() as tmp:

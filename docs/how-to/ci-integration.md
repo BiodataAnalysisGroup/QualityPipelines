@@ -69,6 +69,26 @@ If you prefer managing the installation yourself:
         run: resqui -t ${{ secrets.GITHUB_TOKEN }} -d ${{ secrets.DASHVERSE_TOKEN }}
 ```
 
+## Failing the job on quality checks
+
+By default resqui exits with `0` regardless of the results. Pass `--fail-on`
+to turn check outcomes into a failing job, and `--md` to get a readable report
+in the job summary:
+
+```yaml
+      - name: Run resqui
+        run: resqui -t ${{ secrets.GITHUB_TOKEN }} --md resqui_summary.md --fail-on fail,not_run
+
+      - name: Add report to job summary
+        if: always()
+        run: cat resqui_summary.md >> "$GITHUB_STEP_SUMMARY"
+```
+
+`fail` means an indicator was checked and not satisfied; `not_run` means the
+check could not be performed (for example, a Docker-based plugin on a runner
+without Docker). Each check's `outcome` field in `resqui_summary.json` carries
+the same values.
+
 ## Uploading to a self-hosted DashVerse
 
 By default results are uploaded to the public instance at

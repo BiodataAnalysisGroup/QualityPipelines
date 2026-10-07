@@ -7,6 +7,10 @@ import json
 from resqui.api import APIClient
 
 
+# Whether an indicator is satisfied ("pass"/"fail"), or could not be checked.
+OUTCOMES = ("pass", "fail", "not_run")
+
+
 @dataclass(frozen=True)
 class Context:
     """A basic context to hold"""
@@ -55,6 +59,23 @@ class Summary:
         self.checks = []
 
     def add_indicator_result(self, indicator, checking_software, result):
+        self._add_check(
+            indicator,
+            checking_software,
+            result,
+            outcome="pass" if result.success else "fail",
+        )
+
+    def add_not_run(self, indicator, checking_software, reason):
+        """Record an indicator that could not be checked, e.g. its plugin failed to initialise."""
+        result = CheckResult(
+            process=f"{checking_software.name} could not check this indicator.",
+            status_id="schema:FailedActionStatus",
+            evidence=reason,
+        )
+        self._add_check(indicator, checking_software, result, outcome="not_run")
+
+    def _add_check(self, indicator, checking_software, result, outcome):
         self.checks.append(
             {
                 "@type": "CheckResult",
@@ -67,8 +88,15 @@ class Summary:
                 "status": {"@id": result.status_id},
                 "output": result.output,
                 "evidence": result.evidence,
+                "outcome": outcome,
             }
         )
+
+    def outcome_counts(self):
+        counts = {outcome: 0 for outcome in OUTCOMES}
+        for check in self.checks:
+            counts[check["outcome"]] += 1
+        return counts
 
     def to_json(self):
         return json.dumps(
